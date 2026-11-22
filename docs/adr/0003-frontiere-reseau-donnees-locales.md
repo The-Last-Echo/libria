@@ -1,0 +1,3 @@
+# Frontière réseau et données locales
+
+**Statut : accepté.** La bibliothèque reste disponible hors ligne, sans compte ni serveur central obligatoire ; les requêtes vers les sources de métadonnées n’ont lieu qu’à la demande explicite et transmettent uniquement l’ISBN ou les termes de recherche saisis. Les résultats sont conservés localement, sans identifiant ni analyse en arrière-plan. Libria ne propose ni réglage « désactiver Internet » — la personne ne pourrait pas le vérifier, puisque l’application déclare malgré tout l’autorisation réseau — ni variante d’APK sans Internet. Ce choix privilégie la confidentialité et l’accès durable aux données, tout en acceptant que l’enrichissement externe dépende de services tiers.

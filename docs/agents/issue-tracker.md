@@ -35,8 +35,9 @@ Read it with `gh issue view <number> --json number,title,body,labels,comments`.
 Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
 
 - **Map**: a single issue labelled `wayfinder:map`.
-- **Child ticket**: an issue linked to the map as a GitHub sub-issue. Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body.
-- **Blocking**: use native issue dependencies when available; otherwise use a `Blocked by: #<n>` line.
+- **Child ticket**: an issue linked to the map as a GitHub sub-issue: `gh issue create --parent <map> ...`, or `gh issue edit <map> --add-sub-issue <child>` afterwards. Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`).
+- **Blocking**: GitHub's native issue dependencies: `gh issue create --blocked-by <n>,<n> ...` or `gh issue edit <child> --add-blocked-by <blocker>`. Fallback: a `Blocked by: #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
+- **Count open blockers**: `gh issue view <n> --json blockedBy --jq '[.blockedBy.nodes[] | select(.state == "OPEN")] | length'` (0 means startable).
 - **Frontier query**: list the map's open children, excluding those with open blockers or assignees.
 - **Claim**: `gh issue edit <n> --add-assignee @me`.
 - **Resolve**: comment, close, then append a context pointer to the map's Decisions-so-far.

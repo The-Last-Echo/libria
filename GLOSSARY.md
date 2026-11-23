@@ -11,9 +11,9 @@ _Avoid_: `Book` comme entité canonique
 
 **Édition (`Edition`)** : Publication particulière d’une œuvre, décrite notamment par son ISBN, sa maison d’édition, sa date, sa langue et son format.
 
-**Exemplaire (`Copy`)** : Copie physique d’une édition, avec ses propres informations d’acquisition, de possession, d’état et d’emplacement.
+**Exemplaire (`Copy`)** : Copie physique d’une édition, avec ses propres informations d’acquisition, de possession, d’état et d’emplacement. Un exemplaire emprunté reste actif après la clôture du prêt entrant et conserve le nom de son propriétaire.
 
-**Bibliothèque (`Library`)** : Ensemble des œuvres qui possèdent au moins un exemplaire actif. Un exemplaire prêté ou perdu reste actif ; un exemplaire donné ou vendu ne compte plus dans la Bibliothèque, même si son enregistrement est conservé.
+**Bibliothèque (`Library`)** : Ensemble des œuvres qui possèdent au moins un exemplaire actif. Un exemplaire prêté, emprunté ou perdu reste actif ; un exemplaire donné ou vendu ne compte plus dans la Bibliothèque, même si son enregistrement est conservé.
 
 **Identifiant bibliographique (`Identifier`)** : Valeur qui permet de reconnaître ou de relier une œuvre ou une édition, comme un ISBN ou un identifiant de catalogue.
 
@@ -36,7 +36,7 @@ _Avoid_: sujet bibliographique
 
 ## Organisation et souhaits
 
-**Étagère (`Shelf`)** : Regroupement nommé d’œuvres dans la Bibliothèque ; en V1, les étagères sont créées et organisées manuellement.
+**Étagère (`Shelf`)** : Regroupement nommé d’œuvres dans la Bibliothèque ; en V1, les étagères sont créées et organisées manuellement. Les liens d’une œuvre avec ses étagères peuvent être conservés après son retrait de la Bibliothèque ; l’œuvre reste masquée tant qu’elle n’a aucun exemplaire actif.
 _Avoid_: collection
 
 **Étagère intelligente (`SmartShelf`)** : Étagère dont le contenu est défini par des critères de recherche enregistrés, prévue après la V1.
@@ -70,7 +70,7 @@ _Avoid_: annotation
 
 ## Exemplaires et prêts
 
-**Possession (`Ownership`)** : Relation d’un exemplaire avec son propriétaire : possédé par la personne qui utilise Libria (`owned`) ou emprunté à quelqu’un d’autre (`borrowed`).
+**Possession (`Ownership`)** : Relation d’un exemplaire avec son propriétaire : possédé par la personne qui utilise Libria (`owned`) ou emprunté à quelqu’un d’autre (`borrowed`). Pour un exemplaire emprunté, le propriétaire courant est porté par cet exemplaire dans son nom de propriétaire.
 
 **Disponibilité d’un exemplaire (`CopyAvailability`)** : État de gestion d’un exemplaire : disponible (`available`), prêté (`lent`), perdu (`lost`), donné (`given`) ou vendu (`sold`). `lent` et `lost` restent dans la Bibliothèque ; `given` et `sold` n’y comptent plus.
 

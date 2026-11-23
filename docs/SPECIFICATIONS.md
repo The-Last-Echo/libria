@@ -1,6 +1,6 @@
 # SPÉCIFICATIONS — Libria (nom de travail)
 
-> Version 1.1
+> Version 1.3
 > **Statuts** : ✅ Validé · ❓ À définir · ⏸️ Reporté.
 > **💡 Proposé** = recommandation de l'assistant, non validée tant que l'auteur ne l'a pas confirmée.
 > **🔎 Vérifié** = constaté dans une source consultée (date : novembre 2026). **Hypothèse** = non vérifié.
@@ -109,7 +109,7 @@ Notes libres, citations, réflexions, marque-pages, notes liées à une page ou 
 
 ### 6.7 Prêts
 - ✅ Prêtés et empruntés, historique, dates de retour. Noms saisis librement, pas d'accès aux contacts. Rappel de retour **facultatif**.
-- ✅ (délégué) Prêter un exemplaire le passe automatiquement en « Prêté » ; le retour le remet « Disponible ». Un livre emprunté est un exemplaire dont le propriétaire est une autre personne, statut « Emprunté », exclu des statistiques de possession.
+- ✅ (délégué) Prêter un exemplaire le passe automatiquement en « Prêté » ; le retour le remet « Disponible ». Un exemplaire emprunté a `ownership = borrowed` et son propriétaire courant est enregistré dans `owner_name` ; il est exclu des statistiques de possession. ❓ **En attente de confirmation (ticket #6)** : décision prise en session = il reste actif dans la Bibliothèque après la clôture du prêt entrant ; l'alternative recommandée est qu'il en sorte (nouvelle disponibilité « rendu ») en gardant son historique.
 
 ### 6.8 Données, export, sauvegarde
 - ✅ V1 : export et import complets (données et images), export CSV.
@@ -133,6 +133,8 @@ Notes libres, citations, réflexions, marque-pages, notes liées à une page ou 
 ## 8. Modèle de données
 
 > ✅ = validé par l'auteur (version 0.9 du modèle).
+
+*Le vocabulaire canonique du domaine (termes français et noms dans le code) est dans `GLOSSARY.md`, qui fait foi en cas de divergence ; les décisions d'architecture sont dans `docs/adr/`.*
 
 ### 8.1 Principes
 - ✅ Identifiants uniques et dates de modification sur toutes les tables ; migrations versionnées et testées ; recherche locale rapide ; couvertures en fichiers avec miniatures.
@@ -168,7 +170,7 @@ Notes libres, citations, réflexions, marque-pages, notes liées à une page ou 
 
 **wishlist_items** : `id`, `work_id`, `edition_id` (facultatif), `priority`, `note`, `added_at`.
 
-**borrowers** : `id`, `name` (personnes à qui je prête ou qui me prêtent ; noms libres, pas de contacts). **loans** : `id`, `copy_id`, `direction` (`lent` ou `borrowed`), `borrower_id`, `lent_on`, `due_on` (facultatif), `returned_on` (vide = en cours), `reminder_at` (facultatif), `note`, horodatages. Index unique partiel : au plus **un prêt en cours par exemplaire**.
+**loan_parties** (partie à un prêt ; remplace `borrowers`, voir `GLOSSARY.md`) : `id`, `name` (personnes à qui je prête ou qui me prêtent ; noms libres, pas de contacts). **loans** : `id`, `copy_id`, `direction` (`lent` ou `borrowed`), `party_id`, `lent_on`, `due_on` (facultatif), `returned_on` (vide = en cours), `reminder_at` (facultatif), `note`, horodatages. Index unique partiel : au plus **un prêt en cours par exemplaire**.
 
 **images** : `id`, `kind` (cover, photo), `relative_path`, `width`, `height`, `sha256`, `source` (catalogue, galerie, caméra), `attribution` (texte), `created_at`. Les miniatures sont des fichiers de cache dérivés, absents de la base.
 
@@ -177,14 +179,15 @@ Notes libres, citations, réflexions, marque-pages, notes liées à une page ou 
 **search_index** : table de recherche plein texte (titres, sous-titres, auteurs, série, éditeur, ISBN, étiquettes). ✅ Tokenisation insensible aux accents. À vérifier dans le SQLite embarqué avec Drift.
 
 ### 8.3 Invariants et règles
-1. **Livre visible dans la Bibliothèque** = œuvre ayant au moins un exemplaire hors corbeille (possédé ou emprunté). Une œuvre sans exemplaire n'y figure pas : elle apparaît dans l'historique de lecture, la liste de souhaits ou la bibliothèque 3D future.
-2. **Statut courant d'une œuvre** = statut de sa dernière entrée de lecture (par `started_on`, puis création). Aucune entrée = pas de statut. Une relecture = nouvelle entrée, les précédentes restent.
-3. **Prêter** un exemplaire : crée un prêt en cours, passe `availability` à `lent`. **Rendre** : renseigne `returned_on`, repasse à `available`. Un exemplaire emprunté a `ownership = borrowed`, `owner_name` rempli, et n'entre pas dans les statistiques de possession.
+1. **Livre visible dans la Bibliothèque** = œuvre ayant au moins un exemplaire **actif** : hors corbeille et de disponibilité `available`, `lent` ou `lost` (`given` et `sold` n'y comptent plus, leur enregistrement est conservé). Une œuvre sans exemplaire actif n'y figure pas : elle apparaît dans l'historique de lecture, la liste de souhaits ou la bibliothèque 3D future.
+2. **Statut courant d'une œuvre** = statut de sa dernière entrée de lecture (par `started_on`, puis création). ✅ Une nouvelle entrée « À lire » après une lecture terminée devient donc le statut courant, et les filtres de statut de la Bibliothèque utilisent ce statut courant, pas l'historique des entrées (ticket #7). ❓ **Précision à confirmer** : une entrée sans `started_on` (cas d'une entrée « À lire ») compte comme la plus récente, puis départage par création ; sans cela l'ancienne entrée datée l'emporterait. Aucune entrée = pas de statut. Une relecture = nouvelle entrée, les précédentes restent.
+3. **Prêter** un exemplaire : crée un prêt en cours, passe `availability` à `lent`. **Rendre** : renseigne `returned_on`, repasse à `available`. Un exemplaire emprunté a `ownership = borrowed`, son propriétaire dans `owner_name`, et n'entre pas dans les statistiques de possession. ❓ Effet du retour d'un emprunt entrant sur l'activité de l'exemplaire : en attente de confirmation (voir §6.7).
 4. **Ajout par ISBN** : (a) normaliser l'ISBN ; (b) si une édition avec cet ISBN existe → doublon niveau A ; (c) sinon, chercher une œuvre par identifiant externe (Open Library, Inventaire) → rattacher la nouvelle édition à cette œuvre ; (d) sinon, créer œuvre, édition et exemplaire ; (e) suggestion de niveau B (même titre normalisé et même premier auteur) non bloquante.
 5. **Suppression** : supprimer un exemplaire le met en corbeille ; si c'était le dernier, l'œuvre quitte la Bibliothèque mais garde ses entrées de lecture, notes et édition. Supprimer une œuvre met en corbeille en cascade ses éditions, exemplaires, entrées de lecture, annotations et prêts, restaurables ensemble.
 6. **Liste de souhaits** : quand un exemplaire est ajouté pour une œuvre souhaitée, proposer de la retirer de la liste.
-7. **Enrichissement** : jamais d'écrasement d'un champ marqué `user_edited`.
-8. **Ajout minimal** : seul le titre est obligatoire ; auteur, ISBN et le reste sont facultatifs.
+7. ✅ **Étagères manuelles** (ticket #6) : les liens entre une œuvre et ses étagères sont conservés quand son dernier exemplaire quitte la Bibliothèque ; l'œuvre reste masquée tant qu'elle n'a aucun exemplaire actif.
+8. **Enrichissement** : jamais d'écrasement d'un champ marqué `user_edited`.
+9. **Ajout minimal** : seul le titre est obligatoire ; auteur, ISBN et le reste sont facultatifs.
 
 ### 8.4 Index principaux (à confirmer par mesure)
 `works(title_sort)`, `editions(work_id)`, `editions(isbn13)` partiel unique, `copies(edition_id)`, `copies(availability)`, `reading_entries(work_id, started_on)`, `reading_entries(status)`, `contributions(person_id)`, `annotations(work_id)`, `loans(copy_id)` partiel unique sur prêts en cours, `identifiers(scheme, value)` unique.
@@ -231,8 +234,10 @@ Normalisation ISBN (dont ISBN-10 vers ISBN-13), détection de doublons A/B/C, ra
 
 - ✅ Internet intégré et assumé : requêtes uniquement sur action de l'utilisateur ; seul l'ISBN ou la recherche est envoyé ; aucun identifiant ni analyse ; résultats conservés localement ; explication claire à l'utilisateur.
 - ✅ Google Books et Anna's Archive non retenus.
-- 🔎 **Open Library** : ses API ne sont pas destinées à servir de base de données à des services tiers ; en cas d'abus, limitation ou blocage ; une identification de l'application via l'en-tête User-Agent avec un contact est recommandée (palier de débit plus élevé indiqué par une bibliothèque tierce, **à vérifier**). Pas de téléchargement en masse.
-- 🔎 **Inventaire** : base contributive aux données publiées sous CC0, liée à Wikidata ; serveur sous AGPLv3 ; entrées accessibles par ISBN. **À vérifier** : conditions d'usage de l'API, limites de débit, licence des couvertures.
+- 🔎 **Open Library** (ticket #2, pages officielles `/developers/api` et `/developers/licensing`, consultées en novembre 2026) : API prévues pour des recherches humaines en temps réel, **pas comme base de données pour des services tiers** ; priorité aux projets ouverts ; **1 requête/seconde** par défaut, **3 requêtes/seconde** si l'application s'identifie par un `User-Agent` avec nom et e-mail de contact ; mettre les réponses en cache ; préférer `search.json` à de nombreuses requêtes unitaires ; pas de téléchargement en masse (utiliser les exports mensuels) ; abus = limitation ou blocage ; formulaire d'enregistrement d'application proposé. Couvertures : API dédiée, 100 recherches par identifiant et par adresse toutes les 5 minutes. Licence : aucun nouveau droit revendiqué sur la base, mais des droits peuvent exister sur certaines contributions ; **rien d'établi pour les couvertures**.
+- ❓ Le `User-Agent` exige une adresse de contact visible publiquement (application open source) : prévoir une adresse dédiée au projet, pas une adresse personnelle.
+- 🔎 **Inventaire** (ticket #3 ; rapport de l'agent, **non vérifié de façon indépendante** : la documentation est une page générée par script) : données bibliographiques décrites comme CC0 (à distinguer des données tierces), serveur sous AGPL-3.0 ; résolution publique par ISBN (`/api/entities/by-uris?uris=isbn:...`) avec lien édition → œuvre ; `User-Agent` avec contact demandé ; limites par route et HTTP 429 en cas de dépassement, sans quota global publié ; couvertures exposées sans licence structurée (certaines viennent d'Open Library ou de Wikimedia, retrait possible sur demande).
+- ❓ **Couvertures** : stockage local, attribution et contenu de l'archive d'export à décider (ticket #10) ; couverture réelle des deux sources sur de vrais livres, dont français, à mesurer (ticket #11).
 - 💡 Risque : dépendance à deux services associatifs. Mesures : un module par source, cache local, saisie manuelle toujours possible, usage modéré.
 - ❓ Licences des couvertures à vérifier avant de les stocker durablement.
 - ⏸️ Base communautaire facultative de fiches vérifiées (§17).
@@ -310,6 +315,11 @@ Voir les statuts ✅ dans chaque section. Principales : offline-first, Internet 
 8. Palette, typographie, thèmes, personnalisation.
 9. Licences des couvertures, conditions d'usage des API.
 10. Durée de la corbeille : 30 jours proposés.
+11. Cycle de vie d'un exemplaire **emprunté** (ticket #6) : session = il reste actif après le retour ; à confirmer (alternative : nouvelle disponibilité « rendu », qui le sort de la Bibliothèque). Le propriétaire est porté par `owner_name` (le même nom figure aussi dans le prêt entrant : doublon possible).
+12. ✅ Statut courant et relectures : résolu (ticket #7), sous réserve de la règle des entrées sans date de début (voir §8.3, règle 2).
+13. Vocabulaire : « note » désigne à la fois l'évaluation (étoiles) et un type d'annotation ; choisir deux termes distincts.
+14. Signification du type d'image `photo` (photo de quoi ?) ou suppression.
+15. ✅ Résolu (ticket #6) : les liens d'étagères sont conservés, l'œuvre reste masquée (§8.3, règle 7).
 
 ## 17. Idées futures (⏸️ à conserver)
 
@@ -332,6 +342,8 @@ Voir les statuts ✅ dans chaque section. Principales : offline-first, Internet 
 ## Journal des modifications
 
 - v0.1 — Création. v0.2 — Catalogue d'abord, GitHub + CI. v0.3 — Internet validé ; propositions.
+- v1.3 — Fusion des modifications des sessions des tickets #6 et #7 ; faits vérifiés des recherches Open Library et Inventaire (tickets #2 et #3) ; deux points marqués à confirmer (retour d'un emprunt, entrées sans date de début).
+- v1.2 — Synchronisation avec `GLOSSARY.md` et les ADR 0001 à 0005 : `borrowers` devient `loan_parties`, définition de la Bibliothèque précisée selon la disponibilité des exemplaires ; points ouverts 11 à 15 ajoutés.
 - v1.1 — Développement confié aux skills de Matt Pocock ; squelette « phase 0 » non adopté ; identifiant Android `com.thelastecho.libria` ; constats d'outillage Flutter 3.50.
 - v1.0 — Modèle de données validé ; nom Libria vérifié ; phase 0 du développement lancée et livrée (non compilée).
 - v0.9 — Onglets et scan validés ; fiche de direction artistique v1.1 produite (préréglages d'accent, bordures de champ, compléments) ; modèle de données détaillé proposé (§8).
